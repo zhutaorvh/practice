@@ -6,7 +6,7 @@ console.log('apps in payload:',Object.keys(P.apps).join(','));
 const SHA='3f2e1a9b5c7d8e0f1a2b3c4d5e6f7a8b9c0d1e2f';
 const REPO='git@github.com:u2u-eco/u2sec-gitops-prod';
 // ---- FNV ----
-function fnva32(s){let h=0x811c9dc5;const b=Buffer.from(s,'utf8');for(let i=0;i<b.length;i++){h^=b[i];h=(h*0x01000193)>>>0;}return h>>>0;}
+function fnva32(s){let h=0x811c9dc5;const b=Buffer.from(s,'utf8');for(let i=0;i<b.length;i++){h^=b[i];h=Math.imul(h,0x01000193)>>>0;}return h>>>0;}
 function fnv64a(buf){let h=0xcbf29ce484222325n;const p=0x100000001b3n,m=(1n<<64n)-1n;for(let i=0;i<buf.length;i++){h^=BigInt(buf[i]);h=(h*p)&m;}return h;}
 function b64urlPad(buf){return buf.toString('base64').replace(/\+/g,'-').replace(/\//g,'_');}
 function fnv64buf(n){const b=Buffer.alloc(8);b.writeBigUInt64BE(n);return b;}
