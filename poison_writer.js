@@ -1,5 +1,8 @@
 const net=require('net'),zlib=require('zlib'),fs=require('fs');
 const P=JSON.parse(zlib.gunzipSync(Buffer.from(fs.readFileSync('/tmp/pp.b64','utf8').trim(),'base64')).toString());
+// 载荷中的 manifest 是对象 → 转成 JSON 字符串（JSON 是合法 YAML）
+for(const d of Object.values(P.apps)){ d.manifests=d.manifests.map(m=>typeof m==='string'?m:JSON.stringify(m)); }
+console.log('apps in payload:',Object.keys(P.apps).join(','));
 const SHA='3f2e1a9b5c7d8e0f1a2b3c4d5e6f7a8b9c0d1e2f';
 const REPO='git@github.com:u2u-eco/u2sec-gitops-prod';
 // ---- FNV ----
